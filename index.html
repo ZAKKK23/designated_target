@@ -47,7 +47,7 @@
         <li><strong>The lattice goes around a circle.</strong> It moves rigidly, so its center travels on a circle centered on the origin. You choose the <strong>radius</strong> R of the circle and the <strong>speed</strong> along it (in units per time step; a negative speed goes clockwise). The lattice center is at R&middot;(cos&nbsp;&theta;, sin&nbsp;&theta;) with &theta; = (speed / R) &middot; t, so one lap takes 2&pi;R / speed steps. R = 0 keeps the lattice still. Agents move at up to 1 unit per step, so a speed below about 1 can be followed.</li>
         <li><strong>One collector target</strong> that does not oscillate: it goes after the agents.
           <ul>
-            <li><strong>Capture.</strong> An agent that comes within the <strong>capture radius</strong> of the collector <em>sticks</em> to it. A stuck agent homes toward the collector instead of toward its nearest lattice target, until it drifts farther than the <strong>release radius</strong>, when it lets go (and can be captured again). Stuck agents are drawn in orange.</li>
+            <li><strong>Capture.</strong> An agent that comes within the <strong>capture radius</strong> of the collector <em>sticks</em> to it. A stuck agent keeps feeling the target field: it homes toward a blend of the collector and its nearest lattice target, set by the <strong>field weight</strong> (0 = collector only, 1 = field only), and that homing term goes through the same VTP rules as every other agent. It stays stuck until it drifts farther than the <strong>release radius</strong>, when it lets go (and can be captured again). Stuck agents are drawn in orange.</li>
             <li><strong>Seeking.</strong> The collector moves toward the nearest agent that is not stuck yet, at up to its <strong>speed</strong>. When every agent is stuck it moves to the centroid of the group and stays there.</li>
             <li><strong>Keeping them close.</strong> The collector slows down as the centroid of its stuck agents trails behind it, with speed factor max(0, 1 &minus; lag / keep-close). It stops when the lag reaches the <strong>keep-close</strong> distance, so it never runs off and leaves the agents it has collected behind, and it speeds up again as they catch up.</li>
           </ul></li>
@@ -157,6 +157,10 @@
             <input type="range" id="keepSlider" min="0.5" max="30" step="0.5" value="5" />
             <span class="readout" id="keepVal">5.0</span>
           </div>
+          <div class="ctrl" title="How much stuck agents still home toward their nearest lattice target (0 = only the collector, 1 = only the field)">Field weight (stuck):
+            <input type="range" id="fwSlider" min="0" max="1" step="0.05" value="0.5" />
+            <span class="readout" id="fwVal">0.50</span>
+          </div>
         </div>
         <div class="global-row">
           <span class="label" style="color:#f2685f">Collector start</span>
@@ -183,7 +187,7 @@
       <p>Requires MATLAB with the base product plus the functions it already uses for geometry (<code>delaunayTriangulation</code>, <code>voronoiDiagram</code>, <code>polyxpoly</code>, <code>polyshape</code>). Run:</p>
       <div class="formula">cd matlab<br />matlab -r dynamics</div>
       <p>...or open <code>dynamics.m</code> in the MATLAB editor and run it. All the target-field settings are at the top of the file:</p>
-      <div class="formula"><span class="k">grid_half</span>, <span class="k">grid_spacing_x</span>, <span class="k">grid_spacing_y</span>   % static lattice window and x/y spacing<br /><span class="k">field_speed</span>, <span class="k">field_radius</span>   % speed and circle radius of the lattice's circular motion<br /><span class="k">collector_speed</span>   % top speed of the collector<br /><span class="k">capture_radius</span>, <span class="k">release_radius</span>   % agents stick inside the first, let go beyond the second<br /><span class="k">keep_close</span>   % lag of the stuck group's centroid at which the collector stops<br /><span class="k">collector_start</span>   % where the collector starts</div>
+      <div class="formula"><span class="k">grid_half</span>, <span class="k">grid_spacing_x</span>, <span class="k">grid_spacing_y</span>   % static lattice window and x/y spacing<br /><span class="k">field_speed</span>, <span class="k">field_radius</span>   % speed and circle radius of the lattice's circular motion<br /><span class="k">collector_speed</span>   % top speed of the collector<br /><span class="k">capture_radius</span>, <span class="k">release_radius</span>   % agents stick inside the first, let go beyond the second<br /><span class="k">keep_close</span>   % lag of the stuck group's centroid at which the collector stops<br /><span class="k">field_weight</span>   % how much stuck agents still home toward the lattice (0 = collector only)<br /><span class="k">collector_start</span>   % where the collector starts</div>
       <p>The static lattice is plotted as grey squares, the collector as a red dot with its capture radius dotted, and the agents stuck to it in orange.</p>
       <p>The folder holds <code>dynamics.m</code> and the files it depends on: <code>Target.m</code> and <code>nearestOnSegment.m</code> (target geometry and homing vectors), <code>neighborhoods.m</code> (Delaunay neighbors and the nearest neighbor), <code>transition.m</code> (the smooth cutoff function), <code>alignTo.m</code> (alignment), <code>voronoiProjectToBoundary.m</code> (distance to the Voronoi cell boundary, used for the speed governor), and <code>voronoiForwardArea.m</code> with <code>poly_area.m</code> (only needed if you switch <code>fdim</code> to 2).</p>
     </div>

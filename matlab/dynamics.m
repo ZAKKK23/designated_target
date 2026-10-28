@@ -9,7 +9,8 @@ tmax = 1000;
 % (window [-grid_half, grid_half]^2). The spacing is set separately in x
 % and in y. Every agent homes toward whichever target (static lattice point
 % or the collector) is nearest to it, except agents stuck to the collector
-% (see below), which always home toward the collector.
+% (see below), which home toward a blend of the collector and their nearest
+% lattice target.
 grid_half      = 50;
 grid_spacing_x = 5;      % one static target every grid_spacing_x units in x
 grid_spacing_y = 5;      % ... and every grid_spacing_y units in y
@@ -29,9 +30,10 @@ end
 
 % ONE COLLECTOR target. It does not oscillate: it goes after the agents.
 %   - Capture: an agent that comes within capture_radius of the collector
-%     STICKS to it. A stuck agent homes toward the collector (instead of
-%     toward its nearest lattice target) until it drifts farther than
-%     release_radius, at which point it is released and may be re-captured.
+%     STICKS to it. A stuck agent homes toward a blend of the collector and
+%     its nearest lattice target (weight field_weight, below), so it keeps
+%     feeling the target field, until it drifts farther than release_radius,
+%     at which point it is released and may be re-captured.
 %   - Seeking: the collector moves toward the nearest agent that is not
 %     stuck, at up to collector_speed. Once every agent is stuck it moves
 %     to the centroid of the group and stays there.
@@ -44,6 +46,15 @@ capture_radius  = 3;         % agents closer than this stick to the collector
 release_radius  = 25;        % stuck agents farther than this are released
 keep_close      = 5;         % lag of the stuck group's centroid at which the collector stops
 collector_start = [30 0];    % where the collector starts
+
+% FIELD WEIGHT for stuck agents. A stuck agent still feels the target field:
+% its homing direction is the blend
+%   (1-field_weight)*(unit vector to the collector) + field_weight*(unit vector to its nearest lattice target),
+% and that homing term then goes through the normal VTP rules (length 1-s,
+% repulsion priority, alignment, Voronoi speed governor) like every other
+% agent. 0 = stuck agents ignore the field (old behaviour), 1 = they ignore
+% the collector.
+field_weight    = 0.5;
 
 display=true;
 fixframe = false;
@@ -124,11 +135,10 @@ fieldOff = @(t) field_radius*[cos(field_omega*t) sin(field_omega*t)];   % where 
 cp    = collector_start;
 stuck = false(N,1);
 
-% components 1..nStatic are the lattice points; the LAST component is the
-% collector. The Target is rebuilt every step below, because every
-% component moves.
-comps = [ mat2cell(staticPts + fieldOff(0), ones(nStatic,1), 2); {cp} ];
-tar = Target(comps);
+% tar holds the lattice points only (the target field). It is rebuilt every
+% step below, because the lattice moves. The collector is handled
+% separately in the homing step, so that stuck agents can feel both.
+tar = Target(mat2cell(staticPts + fieldOff(0), ones(nStatic,1), 2));
 
 %% Preallocation of some intermediate variables
 [r,a,h0,h,s,l,rho] = deal(zeros(N,1));
@@ -167,9 +177,9 @@ if gdist > 0
     cp = cp + gvec/gdist * min(collector_speed*throttle, gdist);
 end
 
-% move the lattice around its circle; the collector is one more point target
+% move the lattice around its circle
 off = fieldOff(t);
-tar = Target([ mat2cell(staticPts + off, ones(nStatic,1), 2); {cp} ]);
+tar = Target(mat2cell(staticPts + off, ones(nStatic,1), 2));
 
 DT = delaunayTriangulation(X);
 DT_t{t} = DT;
@@ -187,9 +197,18 @@ r = s .* r./rnorm;  % rescale to length s
 a = alignTo(U,nbhd,'expReciprocal');
 
 % homing
-h0 = homeToTarget(tar,X);
-h0(stuck,:) = cp - X(stuck,:);      % stuck agents always home toward the collector
-h = (1-s) .* h0./vecnorm(h0,2,2);   % rescale to length 1-s
+hF = homeToTarget(tar,X);           % toward the nearest lattice target (the field)
+hC = cp - X;                        % toward the collector
+dF = vecnorm(hF,2,2);
+dC = vecnorm(hC,2,2);
+h0 = hF;                            % free agents: nearest target of lattice + collector
+useC = dC < dF;
+h0(useC,:) = hC(useC,:);
+uF = hF./dF;  uF(dF==0,:) = 0;      % unit vectors (0 if already on the target)
+uC = hC./dC;  uC(dC==0,:) = 0;
+% stuck agents keep feeling the field: blend of collector and nearest lattice target
+h0(stuck,:) = (1-field_weight)*uC(stuck,:) + field_weight*uF(stuck,:);
+h = (1-s) .* h0./vecnorm(h0,2,2);   % rescale to length 1-s (VTP homing)
 h(isnan(h)) = 0;                    % protect 0 entries
 
 % direction
@@ -264,7 +283,7 @@ if display==true
         frame = [com(1)-3*rmed com(1)+3*rmed com(2)-3*rmed com(2)+3*rmed];
     end
     axis(frame);
-    title(['$t=',num2str(t),',\; \mathrm{stuck}=',num2str(nnz(stuck)),',\; v_{col}=',num2str(collector_speed),',\; v_{field}=',num2str(field_speed),',\; R_{field}=',num2str(field_radius),'$'], 'Interpreter', 'Latex');
+    title(['$t=',num2str(t),',\; \mathrm{stuck}=',num2str(nnz(stuck)),',\; v_{col}=',num2str(collector_speed),',\; v_{field}=',num2str(field_speed),',\; R_{field}=',num2str(field_radius),',\; w_{field}=',num2str(field_weight),'$'], 'Interpreter', 'Latex');
 end
 
 %% Update

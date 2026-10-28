@@ -37,6 +37,7 @@ const csSlider = $("csSlider"), csVal = $("csVal");
 const capSlider = $("capSlider"), capVal = $("capVal");
 const relSlider = $("relSlider"), relVal = $("relVal");
 const keepSlider = $("keepSlider"), keepVal = $("keepVal");
+const fwSlider = $("fwSlider"), fwVal = $("fwVal");
 const sxSlider = $("sxSlider"), sxVal = $("sxVal");
 const sySlider = $("sySlider"), syVal = $("syVal");
 const stuckInfo = $("stuckInfo");
@@ -61,6 +62,7 @@ function showCollector() {
   capVal.textContent = sim.captureRadius.toFixed(1);
   relVal.textContent = sim.releaseRadius.toFixed(0);
   keepVal.textContent = sim.keepClose.toFixed(1);
+  fwVal.textContent = sim.fieldWeight.toFixed(2);
   sxVal.textContent = sim.startX.toFixed(0);
   syVal.textContent = sim.startY.toFixed(0);
 }
@@ -80,6 +82,7 @@ csSlider.addEventListener("input", () => { sim.collectorSpeed = +csSlider.value;
 capSlider.addEventListener("input", () => { sim.captureRadius = +capSlider.value; showCollector(); });
 relSlider.addEventListener("input", () => { sim.releaseRadius = +relSlider.value; showCollector(); });
 keepSlider.addEventListener("input", () => { sim.keepClose = +keepSlider.value; showCollector(); });
+fwSlider.addEventListener("input", () => { sim.fieldWeight = +fwSlider.value; showCollector(); });
 /* moving the start sliders puts the collector back at that spot right away (and releases every agent) */
 sxSlider.addEventListener("input", () => { sim.startX = +sxSlider.value; showCollector(); sim.resetCollector(); });
 sySlider.addEventListener("input", () => { sim.startY = +sySlider.value; showCollector(); sim.resetCollector(); });
@@ -101,6 +104,7 @@ function restoreDefaults() {
   sim.captureRadius = PARAMS.CAPTURE_RADIUS; setSlider(capSlider, sim.captureRadius);
   sim.releaseRadius = PARAMS.RELEASE_RADIUS; setSlider(relSlider, sim.releaseRadius);
   sim.keepClose = PARAMS.KEEP_CLOSE; setSlider(keepSlider, sim.keepClose);
+  sim.fieldWeight = PARAMS.FIELD_WEIGHT; setSlider(fwSlider, sim.fieldWeight);
   sim.startX = PARAMS.COLLECTOR_X0; setSlider(sxSlider, sim.startX);
   sim.startY = PARAMS.COLLECTOR_Y0; setSlider(sySlider, sim.startY);
   showFieldVel(); showCollector();
@@ -130,7 +134,7 @@ requestAnimationFrame(loop);
 
 /* ---------- matlab file viewer ---------- */
 const FILE_NOTES = {
-  "dynamics.m": "Main script. Target-field settings (lattice spacing in x and y, field circular-motion speed and radius, collector speed / capture / release / keep-close) are at the top; the collector's capture and move step is at the start of the loop; then the VTP loop: Delaunay neighbors, repulsion + alignment + homing, Voronoi speed governor.",
+  "dynamics.m": "Main script. Target-field settings (lattice spacing in x and y, field circular-motion speed and radius, collector speed / capture / release / keep-close, field weight of stuck agents) are at the top; the collector's capture and move step is at the start of the loop; then the VTP loop: Delaunay neighbors, repulsion + alignment + homing, Voronoi speed governor.",
   "Target.m": "Target class: target geometry and the homeToTarget homing-vector method. The lattice and the collector are point components of one Target object.",
   "nearestOnSegment.m": "Geometry helper used internally by Target.m for segment-shaped targets.",
   "neighborhoods.m": "Delaunay-graph neighbors of every agent, plus each agent's nearest neighbor and its distance.",

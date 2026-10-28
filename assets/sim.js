@@ -21,8 +21,9 @@
        circle centered on the origin (radius and speed you choose live)
      - ONE COLLECTOR target that does not oscillate: it goes after the
        agents. An agent that comes within the capture radius STICKS to it
-       and from then on homes toward it (until it drifts past the release
-       radius). The collector seeks the nearest agent that is not stuck,
+       and from then on homes toward a blend of the collector and its
+       nearest lattice target (weight fieldWeight), so it keeps feeling the
+       target field, until it drifts past the release radius. The collector seeks the nearest agent that is not stuck,
        and slows down as the centroid of its stuck agents trails behind
        it (stopping when the lag reaches the keep-close distance), so it
        moves in a way that keeps its collected agents close.
@@ -41,6 +42,7 @@ const PARAMS = {
   CAPTURE_RADIUS: 3,    // agents closer than this to the collector stick to it
   RELEASE_RADIUS: 25,   // stuck agents farther than this are released
   KEEP_CLOSE: 5,        // lag of the stuck group's centroid at which the collector stops
+  FIELD_WEIGHT: 0.5,    // stuck agents home toward (1-w)*collector + w*nearest lattice target (unit vectors); 0 = ignore the field
   COLLECTOR_X0: 30,     // where the collector starts
   COLLECTOR_Y0: 0,
   FIELD_SPEED: 0.2,     // speed of the whole target field along its circle, units per time step (agents move at up to 1); negative = clockwise
@@ -150,6 +152,7 @@ class VTPSim {
     this.captureRadius = PARAMS.CAPTURE_RADIUS;
     this.releaseRadius = PARAMS.RELEASE_RADIUS;
     this.keepClose = PARAMS.KEEP_CLOSE;
+    this.fieldWeight = PARAMS.FIELD_WEIGHT;
     this.startX = PARAMS.COLLECTOR_X0;
     this.startY = PARAMS.COLLECTOR_Y0;
     this.colX = this.startX; this.colY = this.startY;
@@ -319,24 +322,24 @@ class VTPSim {
       }
       ax /= 6; ay /= 6;
 
-      // homing: unit vector toward the nearest target, length (1 - s)
-      let bestD2 = Infinity, hx = 0, hy = 0;
+      // homing: unit vector toward the target, length (1 - s)
       const px = X[2 * i], py = X[2 * i + 1];
-      {
-        // nearest lattice point: the lattice is rectangular, so round each axis
-        // independently, in the frame that moves with the field
-        const H = this.gridHalf, qx = px - this.offX, qy = py - this.offY;
-        const ix = clamp(Math.round((qx + H) / this.spX), 0, this.cellsX);
-        const iy = clamp(Math.round((qy + H) / this.spY), 0, this.cellsY);
-        const dx = -H + ix * this.spX - qx, dy = -H + iy * this.spY - qy;
-        bestD2 = dx * dx + dy * dy; hx = dx; hy = dy;
-      }
-      {
-        const dx = ox - px, dy = oy - py;
-        const d2 = dx * dx + dy * dy;
-        if (d2 < bestD2) { bestD2 = d2; hx = dx; hy = dy; }
-      }
-      if (this.stuck[i]) { hx = ox - px; hy = oy - py; }   // stuck agents always home toward the collector
+      // nearest lattice point (the field): the lattice is rectangular, so round
+      // each axis independently, in the frame that moves with the field
+      const H = this.gridHalf, qx = px - this.offX, qy = py - this.offY;
+      const ix = clamp(Math.round((qx + H) / this.spX), 0, this.cellsX);
+      const iy = clamp(Math.round((qy + H) / this.spY), 0, this.cellsY);
+      const fx = -H + ix * this.spX - qx, fy = -H + iy * this.spY - qy;   // toward the field
+      const cxv = ox - px, cyv = oy - py;                                 // toward the collector
+      const dF = Math.hypot(fx, fy), dC = Math.hypot(cxv, cyv);
+      let hx, hy;
+      if (this.stuck[i]) {
+        // stuck agents keep feeling the field: blend of the two unit vectors
+        const w = this.fieldWeight;
+        hx = (dC > 0 ? (1 - w) * cxv / dC : 0) + (dF > 0 ? w * fx / dF : 0);
+        hy = (dC > 0 ? (1 - w) * cyv / dC : 0) + (dF > 0 ? w * fy / dF : 0);
+      } else if (dC < dF) { hx = cxv; hy = cyv; }   // free agents: nearest target (lattice or collector)
+      else { hx = fx; hy = fy; }
       const hn = Math.hypot(hx, hy);
       if (hn > 0) { hx = ((1 - s[i]) * hx) / hn; hy = ((1 - s[i]) * hy) / hn; } else { hx = 0; hy = 0; }
 

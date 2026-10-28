@@ -42,9 +42,15 @@ currently nearest to it, except agents stuck to the collector (below).
   speed below about 1 can be followed.
 - **One collector target**, which does not oscillate. It goes after the agents:
   - **Capture.** An agent that comes within `capture_radius` of the collector
-    *sticks* to it. A stuck agent homes toward the collector instead of toward
-    its nearest lattice target, until it drifts farther than `release_radius`,
-    when it lets go (and can be captured again).
+    *sticks* to it. A stuck agent keeps feeling the target field: its homing
+    direction is `(1 - field_weight)` times the unit vector to the collector
+    plus `field_weight` times the unit vector to its nearest lattice target.
+    That homing term then goes through the same VTP rules as every other
+    agent (length 1 &minus; *s*, repulsion priority, alignment, Voronoi speed
+    governor). `field_weight = 0` gives the old behaviour (stuck agents ignore
+    the field), `1` makes them ignore the collector. It stays stuck until it
+    drifts farther than `release_radius`, when it lets go (and can be
+    captured again).
   - **Seeking.** The collector moves toward the nearest agent that is not stuck
     yet, at up to `collector_speed`. When every agent is stuck it moves to the
     centroid of the group and stays there.
@@ -81,7 +87,8 @@ python3 -m http.server 8000
 then visit `http://localhost:8000/`. The live controls cover the number of
 agents, &nu;, the lattice spacing in x and y and the half-width, the speed and
 radius of the lattice's circular motion, and the collector's speed, capture
-radius, release radius, keep-close distance and start position.
+radius, release radius, keep-close distance, field weight of stuck agents and
+start position.
 
 ## Running the MATLAB version
 
@@ -106,6 +113,7 @@ capture_radius  = 3;     % agents closer than this stick to the collector
 release_radius  = 25;    % stuck agents farther than this let go
 keep_close      = 5;     % lag of the stuck group's centroid at which the collector stops
 collector_start = [30 0];
+field_weight    = 0.5;   % how much stuck agents still home toward the lattice (0 = collector only)
 ```
 
 The lattice is plotted as grey squares, the collector as a red dot with its
