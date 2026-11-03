@@ -26,7 +26,8 @@
        target field, until it drifts past the release radius. The collector seeks the nearest agent that is not stuck,
        and slows down as the centroid of its stuck agents trails behind
        it (stopping when the lag reaches the keep-close distance), so it
-       moves in a way that keeps its collected agents close.
+       moves in a way that keeps its collected agents close. It never
+   leaves the target field (it is clamped to the moving lattice rectangle).
    Every other agent homes toward whichever target (static or collector)
    is nearest to it.
    =========================================================== */
@@ -207,6 +208,16 @@ class VTPSim {
     this.trail = [];
   }
 
+  /* keep the collector inside the target field: the lattice rectangle
+     [-gridHalf, -gridHalf + cellsX*spX] x [-gridHalf, -gridHalf + cellsY*spY],
+     shifted by the current field offset (so it moves with the field) */
+  clampCollectorToField() {
+    const H = this.gridHalf;
+    const x0 = this.offX - H, y0 = this.offY - H;
+    this.colX = clamp(this.colX, x0, x0 + this.cellsX * this.spX);
+    this.colY = clamp(this.colY, y0, y0 + this.cellsY * this.spY);
+  }
+
   /* collector: capture / release, then move (the top of one MATLAB loop iteration).
        stuck = (stuck & dist <= releaseRadius) | (dist <= captureRadius)
      Then it moves toward the nearest agent that is not stuck, at up to
@@ -242,6 +253,7 @@ class VTPSim {
       this.colX = cx + (vx / dist) * step;
       this.colY = cy + (vy / dist) * step;
     }
+    this.clampCollectorToField();
   }
 
   /* new run. seeded = true reproduces the MATLAB-style fixed seeds. */
