@@ -34,10 +34,6 @@ const fsSlider = $("fsSlider"), fsVal = $("fsVal");
 const frSlider = $("frSlider"), frVal = $("frVal");
 const fieldVelInfo = $("fieldVelInfo");
 const csSlider = $("csSlider"), csVal = $("csVal");
-const capSlider = $("capSlider"), capVal = $("capVal");
-const relSlider = $("relSlider"), relVal = $("relVal");
-const keepSlider = $("keepSlider"), keepVal = $("keepVal");
-const fwSlider = $("fwSlider"), fwVal = $("fwVal");
 const sxSlider = $("sxSlider"), sxVal = $("sxVal");
 const sySlider = $("sySlider"), syVal = $("syVal");
 const stuckInfo = $("stuckInfo");
@@ -59,10 +55,6 @@ function showFieldVel() {
 }
 function showCollector() {
   csVal.textContent = sim.collectorSpeed.toFixed(2);
-  capVal.textContent = sim.captureRadius.toFixed(1);
-  relVal.textContent = sim.releaseRadius.toFixed(0);
-  keepVal.textContent = sim.keepClose.toFixed(1);
-  fwVal.textContent = sim.fieldWeight.toFixed(2);
   sxVal.textContent = sim.startX.toFixed(0);
   syVal.textContent = sim.startY.toFixed(0);
 }
@@ -79,10 +71,6 @@ fsSlider.addEventListener("input", () => { sim.fieldSpeed = +fsSlider.value; sho
 frSlider.addEventListener("input", () => { sim.fieldRadius = +frSlider.value; sim.updateFieldOffset(); showFieldVel(); });
 
 csSlider.addEventListener("input", () => { sim.collectorSpeed = +csSlider.value; showCollector(); });
-capSlider.addEventListener("input", () => { sim.captureRadius = +capSlider.value; showCollector(); });
-relSlider.addEventListener("input", () => { sim.releaseRadius = +relSlider.value; showCollector(); });
-keepSlider.addEventListener("input", () => { sim.keepClose = +keepSlider.value; showCollector(); });
-fwSlider.addEventListener("input", () => { sim.fieldWeight = +fwSlider.value; showCollector(); });
 /* moving the start sliders puts the collector back at that spot right away (and releases every agent) */
 sxSlider.addEventListener("input", () => { sim.startX = +sxSlider.value; showCollector(); sim.resetCollector(); clearStuckHistory(); });
 sySlider.addEventListener("input", () => { sim.startY = +sySlider.value; showCollector(); sim.resetCollector(); clearStuckHistory(); });
@@ -101,10 +89,6 @@ function restoreDefaults() {
   sim.fieldSpeed = PARAMS.FIELD_SPEED; setSlider(fsSlider, sim.fieldSpeed);
   sim.fieldRadius = PARAMS.FIELD_RADIUS; setSlider(frSlider, sim.fieldRadius);
   sim.collectorSpeed = PARAMS.COLLECTOR_SPEED; setSlider(csSlider, sim.collectorSpeed);
-  sim.captureRadius = PARAMS.CAPTURE_RADIUS; setSlider(capSlider, sim.captureRadius);
-  sim.releaseRadius = PARAMS.RELEASE_RADIUS; setSlider(relSlider, sim.releaseRadius);
-  sim.keepClose = PARAMS.KEEP_CLOSE; setSlider(keepSlider, sim.keepClose);
-  sim.fieldWeight = PARAMS.FIELD_WEIGHT; setSlider(fwSlider, sim.fieldWeight);
   sim.startX = PARAMS.COLLECTOR_X0; setSlider(sxSlider, sim.startX);
   sim.startY = PARAMS.COLLECTOR_Y0; setSlider(sySlider, sim.startY);
   showFieldVel(); showCollector();
@@ -264,9 +248,9 @@ function loop() {
   sim.draw();
   drawStuckChart();
   showExportState();
-  stuckInfo.textContent = `${sim.nStuck} of ${sim.N} agents stuck`;
+  stuckInfo.textContent = `${sim.nStuck} of ${sim.N} agents attached`;
   statusLine.textContent =
-    `t = ${sim.t} | N = ${sim.N} | ${sim.nStatic} static targets + collector (${sim.nStuck} stuck) | ` +
+    `t = ${sim.t} | N = ${sim.N} | ${sim.nStatic} static targets + collector (${sim.nStuck} attached) | ` +
     `collector v = ${sim.collectorSpeed.toFixed(2)} | field v = ${sim.fieldSpeed.toFixed(2)}, R = ${sim.fieldRadius.toFixed(1)} | \u03bd = ${sim.nu.toFixed(2)}`;
   requestAnimationFrame(loop);
 }
