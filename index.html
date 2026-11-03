@@ -41,15 +41,14 @@
       <p>The agent then moves along that direction at a speed of tanh(l / L), where <em>l</em> is the distance from the agent to the boundary of its own Voronoi cell along its direction of motion. Crowded agents (small cells) slow down; agents on the edge of the group have an unbounded cell and move at full speed.</p>
 
       <h2>The target field</h2>
-      <p>The targets are all <em>point</em> targets, and every agent homes toward whichever one is currently nearest to it, except agents stuck to the collector (below):</p>
+      <p>The targets are all <em>point</em> targets, and every agent homes toward whichever one is currently nearest to it, the collector included (below):</p>
       <ul>
         <li><strong>Static targets</strong> form a rectangular lattice that covers the plane over [&minus;H, H]&sup2; (by default H = 50), with a <strong>spacing in x</strong> and a <strong>spacing in y</strong> that you choose independently. H and both spacings are adjustable live.</li>
         <li><strong>The lattice goes around a circle.</strong> It moves rigidly, so its center travels on a circle centered on the origin. You choose the <strong>radius</strong> R of the circle and the <strong>speed</strong> along it (in units per time step; a negative speed goes clockwise). The lattice center is at R&middot;(cos&nbsp;&theta;, sin&nbsp;&theta;) with &theta; = (speed / R) &middot; t, so one lap takes 2&pi;R / speed steps. R = 0 keeps the lattice still. Agents move at up to 1 unit per step, so a speed below about 1 can be followed.</li>
         <li><strong>One collector target</strong> that does not oscillate: it goes after the agents.
           <ul>
-            <li><strong>Capture.</strong> An agent that comes within the <strong>capture radius</strong> of the collector <em>sticks</em> to it. A stuck agent keeps feeling the target field: it homes toward a blend of the collector and its nearest lattice target, set by the <strong>field weight</strong> (0 = collector only, 1 = field only), and that homing term goes through the same VTP rules as every other agent. It stays stuck until it drifts farther than the <strong>release radius</strong>, when it lets go (and can be captured again). Stuck agents are drawn in orange.</li>
-            <li><strong>Seeking.</strong> The collector moves toward the nearest agent that is not stuck yet, at up to its <strong>speed</strong>. When every agent is stuck it moves to the centroid of the group and stays there.</li>
-            <li><strong>Keeping them close.</strong> The collector slows down as the centroid of its stuck agents trails behind it, with speed factor max(0, 1 &minus; lag / keep-close). It stops when the lag reaches the <strong>keep-close</strong> distance, so it never runs off and leaves the agents it has collected behind, and it speeds up again as they catch up.</li>
+            <li><strong>Same VTP law.</strong> The collector is a target like the static ones: every agent homes toward whichever target is nearest to it, through the same VTP rules. Agents whose nearest target is the collector are <em>attached</em> to it and drawn in orange; the graph under the simulation counts them.</li>
+            <li><strong>Seeking.</strong> The collector moves toward the nearest agent that is not attached to it, at up to its <strong>speed</strong>. When every agent is attached it moves to the centroid of the group. It never leaves the target field.</li>
           </ul></li>
       </ul>
       <p>The view menu offers <em>follow swarm</em>, <em>fixed (world)</em>, which keeps the camera at the origin so you can watch the lattice circle around it, and <em>follow field</em>, which keeps the camera on the lattice.</p>
@@ -154,22 +153,6 @@
           <div class="ctrl">Speed:
             <input type="range" id="csSlider" min="0" max="1.5" step="0.01" value="0.4" />
             <span class="readout" id="csVal">0.40</span>
-          </div>
-          <div class="ctrl">Capture radius:
-            <input type="range" id="capSlider" min="0.5" max="12" step="0.5" value="3" />
-            <span class="readout" id="capVal">3.0</span>
-          </div>
-          <div class="ctrl">Release radius:
-            <input type="range" id="relSlider" min="5" max="80" step="1" value="25" />
-            <span class="readout" id="relVal">25</span>
-          </div>
-          <div class="ctrl">Keep-close:
-            <input type="range" id="keepSlider" min="0.5" max="30" step="0.5" value="5" />
-            <span class="readout" id="keepVal">5.0</span>
-          </div>
-          <div class="ctrl" title="How much stuck agents still home toward their nearest lattice target (0 = only the collector, 1 = only the field)">Field weight (stuck):
-            <input type="range" id="fwSlider" min="0" max="1" step="0.05" value="0.5" />
-            <span class="readout" id="fwVal">0.50</span>
           </div>
         </div>
         <div class="global-row">
