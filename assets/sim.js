@@ -19,17 +19,12 @@
      - a rectangular lattice of STATIC point targets across the plane,
        with independent spacing in x and in y, that moves rigidly around a
        circle centered on the origin (radius and speed you choose live)
-     - ONE COLLECTOR target that does not oscillate: it goes after the
-       agents. An agent that comes within the capture radius STICKS to it
-       and from then on homes toward a blend of the collector and its
-       nearest lattice target (weight fieldWeight), so it keeps feeling the
-       target field, until it drifts past the release radius. The collector seeks the nearest agent that is not stuck,
-       and slows down as the centroid of its stuck agents trails behind
-       it (stopping when the lag reaches the keep-close distance), so it
-       moves in a way that keeps its collected agents close. It never
-   leaves the target field (it is clamped to the moving lattice rectangle).
-   Every other agent homes toward whichever target (static or collector)
-   is nearest to it.
+   - ONE COLLECTOR target that does not oscillate: it goes after the
+     agents (it moves toward the nearest agent that is not attached to it)
+     and never leaves the target field. Otherwise it is a target like the
+     static ones: every agent homes toward whichever target (static or
+     collector) is nearest to it, by the same VTP rules. Agents whose
+     nearest target is the collector are "attached" to it.
    =========================================================== */
 
 const PARAMS = {
@@ -40,10 +35,6 @@ const PARAMS = {
   GRID_SPACING_X: 5,    // one static target every GRID_SPACING_X units in x
   GRID_SPACING_Y: 5,    // ... and every GRID_SPACING_Y units in y
   COLLECTOR_SPEED: 0.4, // top speed of the collector, units per time step (agents move at up to 1)
-  CAPTURE_RADIUS: 3,    // agents closer than this to the collector stick to it
-  RELEASE_RADIUS: 25,   // stuck agents farther than this are released
-  KEEP_CLOSE: 5,        // lag of the stuck group's centroid at which the collector stops
-  FIELD_WEIGHT: 0.5,    // stuck agents home toward (1-w)*collector + w*nearest lattice target (unit vectors); 0 = ignore the field
   COLLECTOR_X0: 30,     // where the collector starts
   COLLECTOR_Y0: 0,
   FIELD_SPEED: 0.2,     // speed of the whole target field along its circle, units per time step (agents move at up to 1); negative = clockwise
@@ -150,10 +141,6 @@ class VTPSim {
     this.gridSpacingX = PARAMS.GRID_SPACING_X;
     this.gridSpacingY = PARAMS.GRID_SPACING_Y;
     this.collectorSpeed = PARAMS.COLLECTOR_SPEED;
-    this.captureRadius = PARAMS.CAPTURE_RADIUS;
-    this.releaseRadius = PARAMS.RELEASE_RADIUS;
-    this.keepClose = PARAMS.KEEP_CLOSE;
-    this.fieldWeight = PARAMS.FIELD_WEIGHT;
     this.startX = PARAMS.COLLECTOR_X0;
     this.startY = PARAMS.COLLECTOR_Y0;
     this.colX = this.startX; this.colY = this.startY;
@@ -218,38 +205,27 @@ class VTPSim {
     this.colY = clamp(this.colY, y0, y0 + this.cellsY * this.spY);
   }
 
-  /* collector: capture / release, then move (the top of one MATLAB loop iteration).
-       stuck = (stuck & dist <= releaseRadius) | (dist <= captureRadius)
-     Then it moves toward the nearest agent that is not stuck, at up to
-     collectorSpeed * throttle, where throttle = max(0, 1 - lag/keepClose) and
-     lag is how far the centroid of the stuck agents trails the collector. If every
-     agent is stuck it moves to the centroid of the group and stays there. */
+  /* collector: move toward the nearest agent that is not attached to it, at up
+     to collectorSpeed (an agent is attached when the collector is its nearest
+     target, as found by the homing step). If every agent is attached it moves
+     to the centroid of the group. It is then kept inside the target field. */
   updateCollector() {
-    const N = this.N, X = this.X, stuck = this.stuck;
+    const N = this.N, X = this.X, att = this.stuck;
     const cx = this.colX, cy = this.colY;
-    let n = 0, sx = 0, sy = 0, mx = 0, my = 0, bestD2 = Infinity, bi = -1;
+    let mx = 0, my = 0, bestD2 = Infinity, bi = -1;
     for (let i = 0; i < N; i++) {
       const x = X[2 * i], y = X[2 * i + 1];
-      const dx = x - cx, dy = y - cy;
-      const d2 = dx * dx + dy * dy, d = Math.sqrt(d2);
-      const st = (stuck[i] === 1 && d <= this.releaseRadius) || d <= this.captureRadius;
-      stuck[i] = st ? 1 : 0;
       mx += x; my += y;
-      if (st) { n++; sx += x; sy += y; }
-      else if (d2 < bestD2) { bestD2 = d2; bi = i; }
-    }
-    this.nStuck = n;
-    let throttle = 1;
-    if (n > 0) {
-      const lag = Math.hypot(sx / n - cx, sy / n - cy);
-      throttle = Math.max(0, 1 - lag / Math.max(this.keepClose, 1e-9));
+      if (att[i]) continue;
+      const dx = x - cx, dy = y - cy, d2 = dx * dx + dy * dy;
+      if (d2 < bestD2) { bestD2 = d2; bi = i; }
     }
     let gx, gy;
     if (bi >= 0) { gx = X[2 * bi]; gy = X[2 * bi + 1]; }
     else { gx = mx / N; gy = my / N; }
     const vx = gx - cx, vy = gy - cy, dist = Math.hypot(vx, vy);
     if (dist > 0) {
-      const step = Math.min(this.collectorSpeed * throttle, dist);
+      const step = Math.min(this.collectorSpeed, dist);
       this.colX = cx + (vx / dist) * step;
       this.colY = cy + (vy / dist) * step;
     }
@@ -323,6 +299,7 @@ class VTPSim {
       if (m > 0) { nx[i] = this.U[2 * i] / m; ny[i] = this.U[2 * i + 1] / m; }
     }
 
+    let attached = 0;
     for (let i = 0; i < N; i++) {
       // alignment (alignTo.m): sum of w(<ui,uj>) uj over Delaunay neighbors, times 1/6
       let ax = 0, ay = 0;
@@ -344,14 +321,11 @@ class VTPSim {
       const fx = -H + ix * this.spX - qx, fy = -H + iy * this.spY - qy;   // toward the field
       const cxv = ox - px, cyv = oy - py;                                 // toward the collector
       const dF = Math.hypot(fx, fy), dC = Math.hypot(cxv, cyv);
+      // nearest target (lattice or collector), same VTP homing for both;
+      // agents whose nearest target is the collector are attached to it
       let hx, hy;
-      if (this.stuck[i]) {
-        // stuck agents keep feeling the field: blend of the two unit vectors
-        const w = this.fieldWeight;
-        hx = (dC > 0 ? (1 - w) * cxv / dC : 0) + (dF > 0 ? w * fx / dF : 0);
-        hy = (dC > 0 ? (1 - w) * cyv / dC : 0) + (dF > 0 ? w * fy / dF : 0);
-      } else if (dC < dF) { hx = cxv; hy = cyv; }   // free agents: nearest target (lattice or collector)
-      else { hx = fx; hy = fy; }
+      if (dC < dF) { hx = cxv; hy = cyv; this.stuck[i] = 1; attached++; }
+      else { hx = fx; hy = fy; this.stuck[i] = 0; }
       const hn = Math.hypot(hx, hy);
       if (hn > 0) { hx = ((1 - s[i]) * hx) / hn; hy = ((1 - s[i]) * hy) / hn; } else { hx = 0; hy = 0; }
 
@@ -378,6 +352,7 @@ class VTPSim {
       const sp = Math.tanh(l / L);          // tanh(Infinity) = 1
       this.Unext[2 * i] = sp * u1x; this.Unext[2 * i + 1] = sp * u1y;
     }
+    this.nStuck = attached;
   }
 
   /* apply the position update, advance time and the field, compute the next step */
@@ -455,12 +430,9 @@ class VTPSim {
       ctx.fillRect(px - sq / 2, py - sq / 2, sq, sq);
     }
 
-    // collector: capture radius ring + marker
+    // collector marker
     {
       const [px, py] = toPx(this.colX, this.colY);
-      ctx.strokeStyle = "rgba(242,104,95,0.6)"; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
-      ctx.beginPath(); ctx.arc(px, py, Math.max(this.captureRadius * scale, 3), 0, Math.PI * 2); ctx.stroke();
-      ctx.setLineDash([]);
       ctx.fillStyle = "rgba(242,104,95,0.25)";
       ctx.beginPath(); ctx.arc(px, py, 14, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#f2685f";
