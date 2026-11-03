@@ -82,6 +82,16 @@
       </div>
       <div class="sim-status" id="statusLine">t = 1</div>
       <div class="sim-canvas-wrap"><canvas id="simCanvas"></canvas></div>
+      <div class="stuck-chart">
+        <div class="stuck-chart-head">
+          <span class="stuck-chart-title">Agents attached to the collector</span>
+          <span class="stuck-chart-now" id="stuckChartNow"></span>
+          <span class="buttons stuck-chart-export">
+            <button id="btnExportPng" disabled>Export image</button>
+          </span>
+        </div>
+        <div class="stuck-chart-wrap"><canvas id="stuckChart"></canvas><div class="stuck-chart-tip" id="stuckChartTip"></div></div>
+      </div>
 
       <div class="controls">
         <div class="global-row">
