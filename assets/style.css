@@ -194,3 +194,16 @@ footer{ text-align:center; color:var(--text-muted); font-size:.85rem; padding:2.
   font-family:var(--mono); font-size:.85rem; color:var(--panel-text);
   background:#161a24; border:1px solid var(--panel-line); border-radius:5px; padding:.25rem .4rem;
 }
+
+/* ---------- attached-agents chart ---------- */
+.stuck-chart { padding: 0.6rem 0.9rem 0.8rem; border-top: 1px solid var(--panel-line); background: var(--panel-bg); color: var(--panel-text); font-family: var(--mono); font-size: 0.78rem; }
+.stuck-chart-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.35rem; }
+.stuck-chart-title { color: var(--panel-text); font-weight: 700; }
+.stuck-chart-now { color: var(--panel-muted); margin-left: auto; }
+.stuck-chart-export { margin-left: 1rem; align-items: center; }
+.stuck-chart-export button { padding: .2rem .6rem; font-size: .75rem; }
+.stuck-chart-export button:disabled { opacity: .4; cursor: default; }
+.stuck-chart-progress { color: var(--panel-muted); }
+.stuck-chart-wrap { position: relative; width: 100%; height: 140px; }
+.stuck-chart-wrap canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+.stuck-chart-tip { position: absolute; top: 4px; pointer-events: none; padding: 2px 6px; border-radius: 4px; background: var(--panel-bg-2); border: 1px solid var(--panel-line); color: var(--panel-text); white-space: nowrap; display: none; }
