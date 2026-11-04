@@ -48,7 +48,7 @@
         <li><strong>One collector target</strong> that does not oscillate: it goes after the agents.
           <ul>
             <li><strong>Same VTP law.</strong> The collector is a target like the static ones: every agent homes toward whichever target is nearest to it, through the same VTP rules. Agents whose nearest target is the collector are <em>attached</em> to it and drawn in orange; the graph under the simulation counts them.</li>
-            <li><strong>Seeking.</strong> The collector moves toward the nearest agent that is not attached to it, at up to its <strong>speed</strong>. When every agent is attached it moves to the centroid of the group. It never leaves the target field.</li>
+            <li><strong>Seeking.</strong> The collector heads for the densest group of free agents, at up to its <strong>speed</strong>: each free agent scores (number of free agents within 2.5 units of it) / (1 + its distance to the collector / 20), and the collector moves toward the best-scoring one. When every agent is attached it moves to the centroid of the group. It never leaves the target field.</li>
           </ul></li>
       </ul>
       <p>The view menu offers <em>follow swarm</em>, <em>fixed (world)</em>, which keeps the camera at the origin so you can watch the lattice circle around it, and <em>follow field</em>, which keeps the camera on the lattice.</p>
