@@ -20,7 +20,7 @@
        with independent spacing in x and in y, that moves rigidly around a
        circle centered on the origin (radius and speed you choose live)
    - ONE COLLECTOR target that does not oscillate: it goes after the
-     agents (it moves toward the nearest agent that is not attached to it)
+     agents (it heads for the densest group of agents not yet attached to it)
      and never leaves the target field. Otherwise it is a target like the
      static ones: every agent homes toward whichever target (static or
      collector) is nearest to it, by the same VTP rules. Agents whose
@@ -35,6 +35,8 @@ const PARAMS = {
   GRID_SPACING_X: 5,    // one static target every GRID_SPACING_X units in x
   GRID_SPACING_Y: 5,    // ... and every GRID_SPACING_Y units in y
   COLLECTOR_SPEED: 0.4, // top speed of the collector, units per time step (agents move at up to 1)
+  CLUSTER_RADIUS: 2.5,   // collector: free agents within this distance of a free agent count toward its group
+  DIST_SCALE: 20,        // collector: a group's score is divided by (1 + distance / DIST_SCALE)
   COLLECTOR_X0: 30,     // where the collector starts
   COLLECTOR_Y0: 0,
   FIELD_SPEED: 0.2,     // speed of the whole target field along its circle, units per time step (agents move at up to 1); negative = clockwise
@@ -141,6 +143,8 @@ class VTPSim {
     this.gridSpacingX = PARAMS.GRID_SPACING_X;
     this.gridSpacingY = PARAMS.GRID_SPACING_Y;
     this.collectorSpeed = PARAMS.COLLECTOR_SPEED;
+    this.clusterRadius = PARAMS.CLUSTER_RADIUS;
+    this.distScale = PARAMS.DIST_SCALE;
     this.startX = PARAMS.COLLECTOR_X0;
     this.startY = PARAMS.COLLECTOR_Y0;
     this.colX = this.startX; this.colY = this.startY;
@@ -205,20 +209,30 @@ class VTPSim {
     this.colY = clamp(this.colY, y0, y0 + this.cellsY * this.spY);
   }
 
-  /* collector: move toward the nearest agent that is not attached to it, at up
-     to collectorSpeed (an agent is attached when the collector is its nearest
-     target, as found by the homing step). If every agent is attached it moves
-     to the centroid of the group. It is then kept inside the target field. */
+  /* collector: go after the densest group of agents not attached to it. Each
+     free agent scores (number of free agents within clusterRadius of it)
+     / (1 + its distance to the collector / distScale), and the collector moves
+     toward the best-scoring one at up to collectorSpeed (an agent is attached
+     when the collector is its nearest target, as found by the homing step).
+     If every agent is attached it moves to the centroid of the group. It is
+     then kept inside the target field. */
   updateCollector() {
     const N = this.N, X = this.X, att = this.stuck;
     const cx = this.colX, cy = this.colY;
-    let mx = 0, my = 0, bestD2 = Infinity, bi = -1;
+    const R2 = this.clusterRadius * this.clusterRadius;
+    let mx = 0, my = 0, best = -1, bi = -1;
     for (let i = 0; i < N; i++) {
       const x = X[2 * i], y = X[2 * i + 1];
       mx += x; my += y;
       if (att[i]) continue;
-      const dx = x - cx, dy = y - cy, d2 = dx * dx + dy * dy;
-      if (d2 < bestD2) { bestD2 = d2; bi = i; }
+      let c = 0;
+      for (let j = 0; j < N; j++) {
+        if (att[j]) continue;
+        const dx = X[2 * j] - x, dy = X[2 * j + 1] - y;
+        if (dx * dx + dy * dy < R2) c++;
+      }
+      const score = c / (1 + Math.hypot(x - cx, y - cy) / this.distScale);
+      if (score > best) { best = score; bi = i; }
     }
     let gx, gy;
     if (bi >= 0) { gx = X[2 * bi]; gy = X[2 * bi + 1]; }
