@@ -28,6 +28,9 @@
      homes only to the collector, ignoring every other target, for attachSteps
      steps, and can attach again only after the collector has stopped being
      its neighbour and become one again.
+   NOISE: on each step, with probability noiseRate, a burst of NOISE_STEPS steps
+   starts during which every agent gets the same unit homing vector, at an angle
+   drawn at random for that burst (in place of its homing toward a target).
    =========================================================== */
 
 const PARAMS = {
@@ -41,6 +44,9 @@ const PARAMS = {
   CLUSTER_RADIUS: 2.5,   // collector: free agents within this distance of a free agent count toward its group
   DIST_SCALE: 20,        // collector: a group's score is divided by (1 + distance / DIST_SCALE)
   ATTACH_STEPS: 200,    // steps an agent stays attached once the collector becomes its Delaunay neighbour
+  NOISE_STEPS: 5,       // length of a noise burst, in steps
+  NOISE_RATE: 0.01,     // probability per step that a noise burst starts (0 = no noise)
+  NOISE_SEED: 7,
   COLLECTOR_X0: 30,     // where the collector starts
   COLLECTOR_Y0: 0,
   FIELD_SPEED: 0.2,     // speed of the whole target field along its circle, units per time step (agents move at up to 1); negative = clockwise
@@ -150,6 +156,8 @@ class VTPSim {
     this.clusterRadius = PARAMS.CLUSTER_RADIUS;
     this.distScale = PARAMS.DIST_SCALE;
     this.attachSteps = PARAMS.ATTACH_STEPS;
+    this.noiseSteps = PARAMS.NOISE_STEPS;
+    this.noiseRate = PARAMS.NOISE_RATE;
     this.startX = PARAMS.COLLECTOR_X0;
     this.startY = PARAMS.COLLECTOR_Y0;
     this.colX = this.startX; this.colY = this.startY;
@@ -287,6 +295,8 @@ class VTPSim {
     this.fieldTheta = this.fieldOmega() * this.t; // field angle at step t is omega * t
     this.updateFieldOffset();
     this.cam = null;
+    this.rngN = mulberry32(seeded ? PARAMS.NOISE_SEED : (Math.random() * 1e9) | 0);
+    this.noiseLeft = 0; this.noiseAngle = 0; this.noisy = false;
     this.resetCollector();
     this.compute();
     if (this.onSetupChange) this.onSetupChange();
@@ -338,6 +348,16 @@ class VTPSim {
       if (m > 0) { nx[i] = this.U[2 * i] / m; ny[i] = this.U[2 * i + 1] / m; }
     }
 
+    // noise: start a burst with probability noiseRate; during a burst every agent
+    // gets the same unit homing vector, at the angle drawn for that burst
+    if (this.noiseLeft === 0 && this.rngN() < this.noiseRate) {
+      this.noiseLeft = this.noiseSteps;
+      this.noiseAngle = 2 * Math.PI * this.rngN();
+    }
+    this.noisy = this.noiseLeft > 0;
+    if (this.noisy) this.noiseLeft--;
+    const nzx = Math.cos(this.noiseAngle), nzy = Math.sin(this.noiseAngle);
+
     let attached = 0;
     for (let i = 0; i < N; i++) {
       // alignment (alignTo.m): sum of w(<ui,uj>) uj over Delaunay neighbors, times 1/6
@@ -370,6 +390,7 @@ class VTPSim {
       }
       const hn = Math.hypot(hx, hy);
       if (hn > 0) { hx = ((1 - s[i]) * hx) / hn; hy = ((1 - s[i]) * hy) / hn; } else { hx = 0; hy = 0; }
+      if (this.noisy) { hx = nzx; hy = nzy; } // noise burst: same homing vector for every agent
 
       // direction
       const u1x = (rx[i] + hx + nu * ax) / (1 + nu);
