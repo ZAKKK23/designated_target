@@ -23,8 +23,11 @@
      agents (it heads for the densest group of agents not yet attached to it)
      and never leaves the target field. Otherwise it is a target like the
      static ones: every agent homes toward whichever target (static or
-     collector) is nearest to it, by the same VTP rules. Agents whose
-     nearest target is the collector are "attached" to it.
+     collector) is nearest to it, by the same VTP rules. An agent becomes
+     "attached" when the collector becomes one of its Delaunay neighbours: it then
+     homes only to the collector, ignoring every other target, for attachSteps
+     steps, and can attach again only after the collector has stopped being
+     its neighbour and become one again.
    =========================================================== */
 
 const PARAMS = {
@@ -37,6 +40,7 @@ const PARAMS = {
   COLLECTOR_SPEED: 0.4, // top speed of the collector, units per time step (agents move at up to 1)
   CLUSTER_RADIUS: 2.5,   // collector: free agents within this distance of a free agent count toward its group
   DIST_SCALE: 20,        // collector: a group's score is divided by (1 + distance / DIST_SCALE)
+  ATTACH_STEPS: 200,    // steps an agent stays attached once the collector becomes its Delaunay neighbour
   COLLECTOR_X0: 30,     // where the collector starts
   COLLECTOR_Y0: 0,
   FIELD_SPEED: 0.2,     // speed of the whole target field along its circle, units per time step (agents move at up to 1); negative = clockwise
@@ -145,6 +149,7 @@ class VTPSim {
     this.collectorSpeed = PARAMS.COLLECTOR_SPEED;
     this.clusterRadius = PARAMS.CLUSTER_RADIUS;
     this.distScale = PARAMS.DIST_SCALE;
+    this.attachSteps = PARAMS.ATTACH_STEPS;
     this.startX = PARAMS.COLLECTOR_X0;
     this.startY = PARAMS.COLLECTOR_Y0;
     this.colX = this.startX; this.colY = this.startY;
@@ -193,10 +198,23 @@ class VTPSim {
   /* put the collector back at its start position and release every agent */
   resetCollector() {
     this.colX = this.startX; this.colY = this.startY;
-    if (!this.stuck || this.stuck.length !== this.N) this.stuck = new Uint8Array(this.N);
-    else this.stuck.fill(0);
+    if (!this.stuck || this.stuck.length !== this.N) {
+      this.stuck = new Uint8Array(this.N);       // 1 = attached this step
+      this.attachLeft = new Int32Array(this.N);  // attached steps remaining
+      this.wasNbr = new Uint8Array(this.N);      // collector was a Delaunay neighbour last step
+    } else { this.stuck.fill(0); this.attachLeft.fill(0); this.wasNbr.fill(0); }
     this.nStuck = 0;
     this.trail = [];
+  }
+
+  /* agents that are Delaunay neighbours of the collector
+     (triangulation of the agents plus the collector point) */
+  collectorNeighbors() {
+    const N = this.N, P = new Float64Array(2 * N + 2);
+    P.set(this.X); P[2 * N] = this.colX; P[2 * N + 1] = this.colY;
+    const isNbr = new Uint8Array(N);
+    for (const j of delaunayNeighbors(P, N + 1)[N]) isNbr[j] = 1;
+    return isNbr;
   }
 
   /* keep the collector inside the target field: the lattice rectangle
@@ -212,8 +230,8 @@ class VTPSim {
   /* collector: go after the densest group of agents not attached to it. Each
      free agent scores (number of free agents within clusterRadius of it)
      / (1 + its distance to the collector / distScale), and the collector moves
-     toward the best-scoring one at up to collectorSpeed (an agent is attached
-     when the collector is its nearest target, as found by the homing step).
+     toward the best-scoring one at up to collectorSpeed (attachment is decided
+     in compute(), from the collector's Delaunay neighbours).
      If every agent is attached it moves to the centroid of the group. It is
      then kept inside the target field. */
   updateCollector() {
@@ -287,6 +305,13 @@ class VTPSim {
     const nbr = delaunayNeighbors(X, N);
     this.nbr = nbr;
 
+    // attach on first contact: the collector has just become a Delaunay neighbour
+    const isNbr = this.collectorNeighbors();
+    for (let i = 0; i < N; i++) {
+      if (isNbr[i] && !this.wasNbr[i] && this.attachLeft[i] === 0) this.attachLeft[i] = this.attachSteps;
+      this.wasNbr[i] = isNbr[i];
+    }
+
     // nearest Delaunay neighbor + distance (neighborhoods.m)
     const s = new Float64Array(N);
     const rx = new Float64Array(N), ry = new Float64Array(N);
@@ -327,19 +352,22 @@ class VTPSim {
 
       // homing: unit vector toward the target, length (1 - s)
       const px = X[2 * i], py = X[2 * i + 1];
-      // nearest lattice point (the field): the lattice is rectangular, so round
-      // each axis independently, in the frame that moves with the field
-      const H = this.gridHalf, qx = px - this.offX, qy = py - this.offY;
-      const ix = clamp(Math.round((qx + H) / this.spX), 0, this.cellsX);
-      const iy = clamp(Math.round((qy + H) / this.spY), 0, this.cellsY);
-      const fx = -H + ix * this.spX - qx, fy = -H + iy * this.spY - qy;   // toward the field
-      const cxv = ox - px, cyv = oy - py;                                 // toward the collector
-      const dF = Math.hypot(fx, fy), dC = Math.hypot(cxv, cyv);
-      // nearest target (lattice or collector), same VTP homing for both;
-      // agents whose nearest target is the collector are attached to it
+      const cxv = ox - px, cyv = oy - py; // toward the collector
       let hx, hy;
-      if (dC < dF) { hx = cxv; hy = cyv; this.stuck[i] = 1; attached++; }
-      else { hx = fx; hy = fy; this.stuck[i] = 0; }
+      if (this.attachLeft[i] > 0) {
+        // attached: home to the collector only, ignoring every other target
+        hx = cxv; hy = cyv; this.stuck[i] = 1; attached++; this.attachLeft[i]--;
+      } else {
+        this.stuck[i] = 0;
+        // nearest lattice point (the field): the lattice is rectangular, so round
+        // each axis independently, in the frame that moves with the field
+        const H = this.gridHalf, qx = px - this.offX, qy = py - this.offY;
+        const ix = clamp(Math.round((qx + H) / this.spX), 0, this.cellsX);
+        const iy = clamp(Math.round((qy + H) / this.spY), 0, this.cellsY);
+        const fx = -H + ix * this.spX - qx, fy = -H + iy * this.spY - qy; // toward the field
+        // free agents: nearest target (lattice or collector), same VTP homing for both
+        if (Math.hypot(cxv, cyv) < Math.hypot(fx, fy)) { hx = cxv; hy = cyv; } else { hx = fx; hy = fy; }
+      }
       const hn = Math.hypot(hx, hy);
       if (hn > 0) { hx = ((1 - s[i]) * hx) / hn; hy = ((1 - s[i]) * hy) / hn; } else { hx = 0; hy = 0; }
 
