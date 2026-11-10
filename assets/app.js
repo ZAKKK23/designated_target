@@ -35,6 +35,7 @@ const frSlider = $("frSlider"), frVal = $("frVal");
 const fieldVelInfo = $("fieldVelInfo");
 const csSlider = $("csSlider"), csVal = $("csVal");
 const atSlider = $("atSlider"), atVal = $("atVal");
+const nzSlider = $("nzSlider"), nzVal = $("nzVal"), noiseInfo = $("noiseInfo");
 const sxSlider = $("sxSlider"), sxVal = $("sxVal");
 const sySlider = $("sySlider"), syVal = $("syVal");
 const stuckInfo = $("stuckInfo");
@@ -74,6 +75,7 @@ frSlider.addEventListener("input", () => { sim.fieldRadius = +frSlider.value; si
 
 csSlider.addEventListener("input", () => { sim.collectorSpeed = +csSlider.value; showCollector(); });
 atSlider.addEventListener("input", () => { sim.attachSteps = +atSlider.value; showCollector(); });
+nzSlider.addEventListener("input", () => { sim.noiseRate = +nzSlider.value; nzVal.textContent = sim.noiseRate.toFixed(3); });
 /* moving the start sliders puts the collector back at that spot right away (and releases every agent) */
 sxSlider.addEventListener("input", () => { sim.startX = +sxSlider.value; showCollector(); sim.resetCollector(); clearStuckHistory(); });
 sySlider.addEventListener("input", () => { sim.startY = +sySlider.value; showCollector(); sim.resetCollector(); clearStuckHistory(); });
@@ -93,6 +95,7 @@ function restoreDefaults() {
   sim.fieldRadius = PARAMS.FIELD_RADIUS; setSlider(frSlider, sim.fieldRadius);
   sim.collectorSpeed = PARAMS.COLLECTOR_SPEED; setSlider(csSlider, sim.collectorSpeed);
   sim.attachSteps = PARAMS.ATTACH_STEPS; setSlider(atSlider, sim.attachSteps);
+  sim.noiseRate = PARAMS.NOISE_RATE; setSlider(nzSlider, sim.noiseRate); nzVal.textContent = sim.noiseRate.toFixed(3);
   sim.startX = PARAMS.COLLECTOR_X0; setSlider(sxSlider, sim.startX);
   sim.startY = PARAMS.COLLECTOR_Y0; setSlider(sySlider, sim.startY);
   showFieldVel(); showCollector();
@@ -253,6 +256,9 @@ function loop() {
   drawStuckChart();
   showExportState();
   stuckInfo.textContent = `${sim.nStuck} of ${sim.N} agents attached`;
+  noiseInfo.textContent = sim.noisy
+    ? `burst: all agents homing at ${((sim.noiseAngle * 180) / Math.PI).toFixed(0)}°`
+    : `${sim.noiseSteps}-step bursts, same homing angle for all agents`;
   statusLine.textContent =
     `t = ${sim.t} | N = ${sim.N} | ${sim.nStatic} static targets + collector (${sim.nStuck} attached, ${sim.attachSteps} steps) | ` +
     `collector v = ${sim.collectorSpeed.toFixed(2)} | field v = ${sim.fieldSpeed.toFixed(2)}, R = ${sim.fieldRadius.toFixed(1)} | \u03bd = ${sim.nu.toFixed(2)}`;
