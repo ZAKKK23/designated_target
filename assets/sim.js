@@ -381,7 +381,7 @@ class VTPSim {
           if (d2 < bd) { bd = d2; fx = dx; fy = dy; }
         }
         // free agents: nearest target (lattice or collector), same VTP homing for both
-        if (Math.hypot(cxv, cyv) < Math.hypot(fx, fy)) { hx = cxv; hy = cyv; } else { hx = fx; hy = fy; }
+        if (Math.hypot(cxv, cyv) < Math.sqrt(bd)) { hx = cxv; hy = cyv; } else { hx = fx; hy = fy; } // sqrt(bd) = Infinity if there are no static targets
       }
       const hn = Math.hypot(hx, hy);
       if (hn > 0) { hx = ((1 - s[i]) * hx) / hn; hy = ((1 - s[i]) * hy) / hn; } else { hx = 0; hy = 0; }
